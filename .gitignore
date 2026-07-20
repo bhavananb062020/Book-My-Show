@@ -1,0 +1,29 @@
+# Node.js dependencies
+node_modules/
+bookmyshow-app/node_modules/
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/
+
+# Coverage reports
+coverage/
+
+# Build folders
+dist/
+build/
+
+# Temporary files
+*.log
