@@ -92,7 +92,7 @@ pipeline {
                 docker stop bms || true
                 docker rm bms || true
 
-                docker run -d --restart=always --name bms -p 3000:3000 bhavananb062020/bms:latest
+                docker run -d --restart=always --name bms -p 3000:80 bhavananb062020/bms:latest
 
                 docker ps -a
 
