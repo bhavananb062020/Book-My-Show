@@ -25,23 +25,23 @@ pipeline {
             }
         }
 
-        // stage('SonarQube Analysis') {
-        //     steps {
-        //         withSonarQubeEnv('sonarqube') {
-        //             sh '''
-        //             $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=BMS -Dsonar.projectKey=BMS
-        //             '''
-        //         }
-        //     }
-        // }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=BMS -Dsonar.projectKey=BMS
+                    '''
+                }
+            }
+        }
 
-        // stage('Quality Gate') {
-        //     steps {
-        //         script {
-        //             waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
-        //         }
-        //     }
-        // }
+        stage('Quality Gate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
+            }
+        }
 
         stage('Install Dependencies') {
             steps {
