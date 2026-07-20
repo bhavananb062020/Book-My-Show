@@ -20,7 +20,7 @@ COPY . .
 EXPOSE 3000
 
 # Set environment variable to prevent OpenSSL errors
-ENV NODE_OPTIONS=--openssl-legacy-provider
+ENV NODE_OPTIONS="--openssl-legacy-provider --max-old-space-size=768"
 ENV PORT=3000
 
 # Start the application
