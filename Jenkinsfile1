@@ -8,6 +8,13 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
+
+        // Docker Hub image
+        DOCKER_IMAGE = 'bhavananb062020/bms:latest'
+
+        // EKS details
+        EKS_CLUSTER_NAME = 'kastro-eks'
+        AWS_REGION = 'ap-south-1'
     }
 
     stages {
@@ -20,8 +27,19 @@ pipeline {
 
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/bhavananb062020/Book-My-Show.git'
-                sh 'ls -la'
+                git branch: 'main',
+                    url: 'https://github.com/bhavananb062020/Book-My-Show.git'
+
+                sh '''
+                    echo "Files in workspace:"
+                    ls -la
+
+                    echo "Application files:"
+                    ls -la bookmyshow-app
+
+                    echo "Kubernetes files:"
+                    ls -la deployment.yml service.yml
+                '''
             }
         }
 
@@ -29,7 +47,9 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                    $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=BMS -Dsonar.projectKey=BMS
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=BMS \
+                        -Dsonar.projectKey=BMS
                     '''
                 }
             }
@@ -38,7 +58,10 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                    waitForQualityGate(
+                        abortPipeline: false,
+                        credentialsId: 'sonar-token'
+                    )
                 }
             }
         }
@@ -46,15 +69,23 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                cd bookmyshow-app
+                    cd bookmyshow-app
 
-                if [ -f package.json ]; then
-                    rm -rf node_modules package-lock.json
-                    npm install
-                else
-                    echo "package.json not found!"
-                    exit 1
-                fi
+                    echo "Checking package.json..."
+
+                    if [ -f package.json ]; then
+
+                        echo "Installing Node.js dependencies..."
+
+                        rm -rf node_modules
+                        npm install
+
+                    else
+
+                        echo "ERROR: package.json not found!"
+                        exit 1
+
+                    fi
                 '''
             }
         }
@@ -62,7 +93,11 @@ pipeline {
         stage('Trivy FS Scan') {
             steps {
                 sh '''
-                trivy fs . > trivyfs.txt
+                    echo "Running Trivy filesystem scan..."
+
+                    trivy fs . > trivyfs.txt
+
+                    echo "Trivy scan completed."
                 '''
             }
         }
@@ -70,53 +105,152 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'dockerhub', toolName: 'docker') {
+
+                    withDockerRegistry(
+                        credentialsId: 'dockerhub',
+                        toolName: 'docker'
+                    ) {
 
                         sh '''
-                        echo "Building Docker Image..."
+                            echo "================================="
+                            echo "Building Docker Image"
+                            echo "================================="
 
-                        docker build --no-cache -t bhavananb062020/bms:latest -f bookmyshow-app/Dockerfile bookmyshow-app
+                            docker build --no-cache \
+                                -t $DOCKER_IMAGE \
+                                -f bookmyshow-app/Dockerfile \
+                                bookmyshow-app
 
-                        echo "Pushing Docker Image..."
 
-                        docker push bhavananb062020/bms:latest
+                            echo "================================="
+                            echo "Docker Image"
+                            echo "================================="
+
+                            docker images | grep bms
+
+
+                            echo "================================="
+                            echo "Pushing Image to Docker Hub"
+                            echo "================================="
+
+                            docker push $DOCKER_IMAGE
+
+                            echo "Docker image pushed successfully."
                         '''
                     }
                 }
             }
         }
 
-        stage('Deploy to Container') {
+        stage('Deploy to EKS') {
+            steps {
+                script {
+
+                    sh '''
+                        echo "================================="
+                        echo "Checking AWS Credentials"
+                        echo "================================="
+
+                        aws sts get-caller-identity
+
+
+                        echo "================================="
+                        echo "Configuring EKS"
+                        echo "================================="
+
+                        aws eks update-kubeconfig \
+                            --name $EKS_CLUSTER_NAME \
+                            --region $AWS_REGION
+
+
+                        echo "================================="
+                        echo "Checking EKS Nodes"
+                        echo "================================="
+
+                        kubectl get nodes
+
+
+                        echo "================================="
+                        echo "Deploying Application"
+                        echo "================================="
+
+                        kubectl apply -f deployment.yml
+
+                        kubectl apply -f service.yml
+
+
+                        echo "================================="
+                        echo "Checking Deployment"
+                        echo "================================="
+
+                        kubectl get deployments
+
+
+                        echo "================================="
+                        echo "Checking Pods"
+                        echo "================================="
+
+                        kubectl get pods
+
+
+                        echo "================================="
+                        echo "Checking Services"
+                        echo "================================="
+
+                        kubectl get svc
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Application') {
             steps {
                 sh '''
-                docker stop bms || true
-                docker rm bms || true
+                    echo "================================="
+                    echo "Waiting for Pods"
+                    echo "================================="
 
-                docker run -d --restart=always --name bms -p 3000:80 bhavananb062020/bms:latest
+                    sleep 20
 
-                docker ps -a
+                    kubectl get pods -o wide
 
-                sleep 10
+                    echo "================================="
+                    echo "Deployment Status"
+                    echo "================================="
 
-                docker logs bms
+                    kubectl rollout status deployment/bms-app --timeout=120s
+
+                    echo "================================="
+                    echo "Final Kubernetes Status"
+                    echo "================================="
+
+                    kubectl get all
                 '''
             }
         }
     }
 
     post {
+
         always {
+
             emailext(
                 attachLog: true,
+
                 subject: "${currentBuild.result}: ${env.JOB_NAME}",
+
                 body: """
-                <h3>BookMyShow Pipeline Result</h3>
-                <b>Project:</b> ${env.JOB_NAME}<br/>
-                <b>Build Number:</b> ${env.BUILD_NUMBER}<br/>
-                <b>Status:</b> ${currentBuild.result}<br/>
-                <b>Build URL:</b> ${env.BUILD_URL}<br/>
+                    <h3>BookMyShow Pipeline Result</h3>
+
+                    <b>Project:</b> ${env.JOB_NAME}<br/>
+                    <b>Build Number:</b> ${env.BUILD_NUMBER}<br/>
+                    <b>Status:</b> ${currentBuild.result}<br/>
+                    <b>Build URL:</b> ${env.BUILD_URL}<br/>
+                    <b>EKS Cluster:</b> ${EKS_CLUSTER_NAME}<br/>
                 """,
+
                 to: "bhavananb2003@gmail.com",
+
                 attachmentsPattern: "trivyfs.txt"
             )
         }
