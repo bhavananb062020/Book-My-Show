@@ -47,8 +47,8 @@ pipeline {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
                         $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=BMS \
-                        -Dsonar.projectKey=BMS
+                        -Dsonar.projectName=BookMyShow  \
+                        -Dsonar.projectKey=BookMyShow 
                     '''
                 }
             }
