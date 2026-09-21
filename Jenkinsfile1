@@ -59,7 +59,7 @@ pipeline {
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate(
                 abortPipeline: true,
-                credentialsId: 'sonar-token'
+                credentialsId: 'sonar-qube'
             )
                 }
             }
@@ -105,7 +105,7 @@ pipeline {
             steps {
                 script {
                     withDockerRegistry(
-                        credentialsId: 'dockerhub',
+                        credentialsId: 'Dockerhub',
                         toolName: 'docker'
                     ) {
                         sh '''
