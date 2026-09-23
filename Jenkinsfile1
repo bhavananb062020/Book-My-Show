@@ -12,7 +12,11 @@ pipeline {
         SCANNER_HOME = tool 'sonar-scanner'
 
         // Docker Hub image
-        DOCKER_IMAGE = 'bhavananb062020/bms:latest'
+        // DOCKER_IMAGE = 'bhavananb062020/bms:latest'
+
+        // ECR image
+        ECR_REPOSITORY = '571996362633.dkr.ecr.ap-south-1.amazonaws.com/bms'
+        DOCKER_IMAGE = "${ECR_REPOSITORY}:latest"
 
         // EKS details
         EKS_CLUSTER_NAME = 'kastro-eks'
@@ -50,12 +54,12 @@ pipeline {
                     sh '''
                         $SCANNER_HOME/bin/sonar-scanner \
                         -Dsonar.projectName=BookMyShow  \
-                        -Dsonar.projectKey=BookMyShow 
+                        -Dsonar.projectKey=BookMyShow
                     '''
                 }
             }
         }
-        
+
         //SonarQube webhook is used(to post the results to jenkins)
         stage('Quality Gate') {
             steps {
@@ -104,39 +108,87 @@ pipeline {
             }
         }
 
-        stage('Docker Build & Push') {
+        // Docker build and push to Docker Hub
+        // stage('Docker Build & Push') {
+        //     steps {
+        //         script {
+        //             withDockerRegistry(
+        //                 credentialsId: 'Dockerhub',
+        //                 toolName: 'docker'
+        //             ) {
+        //                 sh '''
+        //                     echo "================================="
+        //                     echo "Building Docker Image"
+        //                     echo "================================="
+
+        //                     docker build --no-cache \
+        //                         -t $DOCKER_IMAGE \
+        //                         -f bookmyshow-app/Dockerfile \
+        //                         bookmyshow-app
+
+        //                     echo "================================="
+        //                     echo "Docker Image"
+        //                     echo "================================="
+
+        //                     docker images | grep bms
+
+        //                     echo "================================="
+        //                     echo "Pushing Image to Docker Hub"
+        //                     echo "================================="
+
+        //                     docker push $DOCKER_IMAGE
+
+        //                     echo "Docker image pushed successfully."
+        //                 '''
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Docker build and push to ECR
+        stage('Docker Build & Push to ECR') {
             steps {
-                script {
-                    withDockerRegistry(
-                        credentialsId: 'Dockerhub',
-                        toolName: 'docker'
-                    ) {
-                        sh '''
-                            echo "================================="
-                            echo "Building Docker Image"
-                            echo "================================="
+                sh '''
+            echo "================================="
+            echo "AWS Identity"
+            echo "================================="
 
-                            docker build --no-cache \
-                                -t $DOCKER_IMAGE \
-                                -f bookmyshow-app/Dockerfile \
-                                bookmyshow-app
+            aws sts get-caller-identity
 
-                            echo "================================="
-                            echo "Docker Image"
-                            echo "================================="
+            echo "================================="
+            echo "Logging in to Amazon ECR"
+            echo "================================="
 
-                            docker images | grep bms
+            aws ecr get-login-password --region $AWS_REGION | \
+            docker login \
+            --username AWS \
+            --password-stdin $ECR_REPOSITORY
 
-                            echo "================================="
-                            echo "Pushing Image to Docker Hub"
-                            echo "================================="
+            echo "================================="
+            echo "Building Docker Image"
+            echo "================================="
 
-                            docker push $DOCKER_IMAGE
+            docker build --no-cache \
+                -t $DOCKER_IMAGE \
+                -f bookmyshow-app/Dockerfile \
+                bookmyshow-app
 
-                            echo "Docker image pushed successfully."
-                        '''
-                    }
-                }
+            echo "================================="
+            echo "Docker Image"
+            echo "================================="
+
+            docker images | grep bms
+
+            echo "================================="
+            echo "Pushing Image to Amazon ECR"
+            echo "================================="
+
+            docker push $DOCKER_IMAGE
+
+            echo "================================="
+            echo "ECR Push Successful"
+            echo "================================="
+        '''
             }
         }
 

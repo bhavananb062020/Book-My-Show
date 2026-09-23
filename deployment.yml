@@ -16,6 +16,7 @@ spec:
     spec:
       containers:
       - name: bms-container
-        image: bhavananb062020/bms:latest  # Replace with your Docker image
+        image: 571996362633.dkr.ecr.ap-south-1.amazonaws.com/bms:latest
+        # image: bhavananb062020/bms:latest  # Replace with your Docker image(dockerhub))
         ports:
         - containerPort: 80  # Replace with the port your app runs on
