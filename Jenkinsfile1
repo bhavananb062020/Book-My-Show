@@ -245,7 +245,8 @@ pipeline {
                 }
             }
         }
-
+        
+// Verify the application deployment and check the status of pods and services
         stage('Verify Application') {
             steps {
                 sh '''
