@@ -1,11 +1,13 @@
 pipeline {
     agent any
 
+    //Make sure configure jdk17 and nodejs18 available in this build
     tools {
         jdk 'jdk17'
         nodejs 'node18'
     }
 
+    //These are variables used throughout the pipeline.
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
 
@@ -53,7 +55,8 @@ pipeline {
                 }
             }
         }
-
+        
+        //SonarQube webhook is used(to post the results to jenkins)
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
